@@ -1,0 +1,34 @@
+{
+    "version": 1,
+    "schedule": {
+        "type": "simple",
+        "interval": "1s"
+    },
+    "workflow": {
+        "collect": {
+            "metrics": {
+                "/staples/procstat/*" : {}
+            },
+            "config": {
+            },
+            "process": [
+                {
+                    "plugin_name": "passthru",
+                    "plugin_version": 1,
+                    "process": null,
+                    "publish": [
+                        {
+                            "plugin_name": "file",
+                            "plugin_version": 3,
+                            "config": {
+                                "file": "/tmp/snap-file.out"
+                            }
+                        }
+                    ],
+                    "config": null
+                }
+            ],
+            "publish": null
+        }
+    }
+}
