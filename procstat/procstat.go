@@ -3,15 +3,16 @@ package procstat
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/intelsdi-x/snap/control/plugin"
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/ctypes"
 	"github.com/shirou/gopsutil/process"
-	"io/ioutil"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
