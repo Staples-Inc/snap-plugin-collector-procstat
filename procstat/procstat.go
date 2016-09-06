@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	vendor     = "staples"
-	pluginName = "procstat"
-	pluginType = plugin.CollectorPluginType
-	version    = 1
+	vendor        = "staples"
+	pluginName    = "procstat"
+	pluginType    = plugin.CollectorPluginType
+	pluginVersion = 1
 )
 
 var (
@@ -27,16 +27,18 @@ var (
 	errPidFileError = errors.New("Pid read error: specified file not valid.")
 )
 
-// Return information about the plugin for the snap agent
+// Meta returns information about the plugin for the snap agent
 func Meta() *plugin.PluginMeta {
-	return plugin.NewPluginMeta(pluginName, version, pluginType, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
+	return plugin.NewPluginMeta(pluginName, pluginVersion, pluginType, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
 }
 
+// New returns a procstat plugin
 func New() *Procstat {
-	netstat := &Procstat{}
-	return netstat
+	procstat := &Procstat{}
+	return procstat
 }
 
+// Procstat defines procstat type
 type Procstat struct {
 }
 
@@ -76,8 +78,9 @@ func getMapValueByNamespace(m map[string]interface{}, ns []string) (val interfac
 
 	current := ns[0]
 
+	var ok bool
 	if len(ns) == 1 {
-		if val, ok := m[current]; ok {
+		if val, ok = m[current]; ok {
 			return val, err
 		}
 		return val, fmt.Errorf("Key does not exist in map {key %s}", current)
@@ -167,6 +170,11 @@ func getStats(proc *process.Process) (map[string]interface{}, error) {
 		fields["cpu_time_stolen"] = cpuTime.Steal
 		fields["cpu_time_guest"] = cpuTime.Guest
 		fields["cpu_time_guest_nice"] = cpuTime.GuestNice
+	}
+
+	createTime, err := proc.CreateTime()
+	if err == nil {
+		fields["process_uptime"] = time.Now().Unix() - (createTime / 1000)
 	}
 
 	cpuPerc, err := proc.Percent(time.Duration(0))

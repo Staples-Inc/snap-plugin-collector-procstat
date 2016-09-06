@@ -4,7 +4,7 @@
             "collector": {
                 "procstat": {
                     "all": {
-                        "files": "/tmp/snap.pid:coolio,/vagrant/code/go/src/listener/listener.pid"
+                        "files": "/tmp/snap.pid:coolio"
                     }
                 }
             }
