@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/intelsdi-x/snap-plugin-collector-procstat/procstat"
+	"github.com/Staples-Inc/snap-plugin-collector-procstat/procstat"
 	"github.com/intelsdi-x/snap/control/plugin"
 )
 

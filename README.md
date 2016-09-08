@@ -1,3 +1,5 @@
+# snap collector plugin - procstat
+
 ## Getting Started
 The procstat collector takes a specified pid file and collects metrics from the process specified by that pid file.
 ### Build
@@ -30,3 +32,5 @@ This builds the plugin in `/build/rootfs/`
 ## Roadmap
 * Add pgrep functionality for tracking a process.
 * Allow for pid files with mutiple pids separated by a new line
+
+If you have suggestions please open up an issue or provide a pull request.
