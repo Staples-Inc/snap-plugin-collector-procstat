@@ -7,19 +7,16 @@
     "workflow": {
         "collect": {
             "metrics": {
-                "/staples/procstat/*" : {}
+                "/staples/procfs/procstat/*/cpu_usage" : {}
             },
             "config": {
             },
             "process": [
                 {
                     "plugin_name": "passthru",
-                    "plugin_version": 1,
-                    "process": null,
                     "publish": [
                         {
                             "plugin_name": "file",
-                            "plugin_version": 3,
                             "config": {
                                 "file": "/tmp/snap-file.out"
                             }

@@ -12,6 +12,8 @@ import (
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core"
 	"github.com/intelsdi-x/snap/core/ctypes"
+
+	log "github.com/Sirupsen/logrus"
 	"github.com/shirou/gopsutil/process"
 )
 
@@ -34,12 +36,14 @@ func Meta() *plugin.PluginMeta {
 
 // New returns a procstat plugin
 func New() *Procstat {
-	procstat := &Procstat{}
+	s := make(map[int32]*process.Process)
+	procstat := &Procstat{stats: s}
 	return procstat
 }
 
 // Procstat defines procstat type
 type Procstat struct {
+	stats map[int32]*process.Process
 }
 
 // CollectMetrics returns metrics from gopsutil
@@ -49,21 +53,44 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 	mts := []plugin.MetricType{}
 	for _, pid := range pids {
 		pn := strings.Split(pid, ":")
-		pid = pn[0]
-		pidVal, err := getPidFromFile(pid)
-		ps, err := process.NewProcess(pidVal)
+		pidVal, err := getPidFromFile(pn[0])
 		if err != nil {
+			log.Errorf("%v, unable to read pid from file '%v'", err, pn[0])
 			continue
-		} else {
-			fields, _ := getStats(ps)
-			for _, metricType := range metricTypes {
-				ns := metricType.Namespace()
+		}
 
-				val, ok := getMapValueByNamespace(fields, ns[3:].Strings())
+		ps, ok := p.stats[pidVal]
+		if !ok {
+			ps, err = process.NewProcess(pidVal)
+			if err != nil {
+				log.Errorf("pid %v from file '%v' unable to be accessed at /proc", pidVal, pn[0])
+				continue
+			}
+			p.stats[pidVal] = ps
+		}
+
+		var processName string
+
+		if len(pn) > 1 {
+			processName = pn[1]
+		} else {
+			processName, err = ps.Name()
+			if err != nil {
+				log.Errorf("unable to parse process name of pid '%v' in '%v'", pidVal, pn[0])
+				continue
+			}
+		}
+
+		fields, _ := p.getStats(ps)
+		for _, metricType := range metricTypes {
+			ns := metricType.Namespace()
+			if ns[3].Value == processName {
+				val, ok := getMapValueByNamespace(fields, ns[4:].Strings())
 				if ok != nil {
 					continue
 				}
-				appendMetric(&mts, ns, val)
+				metricType.AddData(val)
+				mts = append(mts, metricType)
 			}
 		}
 	}
@@ -100,39 +127,45 @@ func (p *Procstat) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType, e
 	mts := []plugin.MetricType{}
 	for _, pid := range pids {
 		pn := strings.Split(pid, ":")
-		pid = pn[0]
-		pidVal, err := getPidFromFile(pid)
+		pidVal, err := getPidFromFile(pn[0])
 		if err != nil {
-			return mts, err
+			log.Errorf("unable to read pid from file '%v'", pn[0])
+			continue
 		}
-		ps, err := process.NewProcess(pidVal)
+
+		ps, ok := p.stats[pidVal]
+		if !ok {
+			ps, err = process.NewProcess(pidVal)
+			if err != nil {
+				log.Errorf("%v, pid %v from file '%v' unable to be accessed at /proc", err, pidVal, pn[0])
+				continue
+			}
+		}
+
+		var processName string
+
+		if len(pn) > 1 {
+			processName = pn[1]
+		} else {
+			processName, err = ps.Name()
+			if err != nil {
+				log.Errorf("unable to parse process name of pid '%v' in '%v'", pidVal, pn[0])
+				continue
+			}
+		}
+		fields, err := p.getStats(ps)
 		if err != nil {
 			continue
-		} else {
-			var processName string
-			if len(pn) > 1 {
-				processName = pn[1]
-			} else {
-				processName, err = ps.Name()
-				if err != nil {
-					return nil, err
-				}
-			}
-			fields, err := getStats(ps)
-			if err != nil {
-				return nil, err
-			}
-			for name := range fields {
-				fmt.Println(processName)
-				ns := core.NewNamespace(vendor, pluginName).AddStaticElement(processName).AddStaticElement(name)
-				appendMetric(&mts, ns, nil)
-			}
+		}
+		for name := range fields {
+			ns := core.NewNamespace(vendor, "procfs", pluginName).AddStaticElement(processName).AddStaticElement(name)
+			appendMetric(&mts, ns, nil)
 		}
 	}
 	return mts, nil
 }
 
-func getStats(proc *process.Process) (map[string]interface{}, error) {
+func (p *Procstat) getStats(proc *process.Process) (map[string]interface{}, error) {
 	fields := map[string]interface{}{}
 	numThreads, err := proc.NumThreads()
 	if err == nil {
@@ -162,14 +195,6 @@ func getStats(proc *process.Process) (map[string]interface{}, error) {
 	if err == nil {
 		fields["cpu_time_user"] = cpuTime.User
 		fields["cpu_time_system"] = cpuTime.System
-		fields["cpu_time_idle"] = cpuTime.Idle
-		fields["cpu_time_nice"] = cpuTime.Nice
-		fields["cpu_time_iowait"] = cpuTime.Iowait
-		fields["cpu_time_irq"] = cpuTime.Irq
-		fields["cpu_time_soft_irq"] = cpuTime.Softirq
-		fields["cpu_time_stolen"] = cpuTime.Steal
-		fields["cpu_time_guest"] = cpuTime.Guest
-		fields["cpu_time_guest_nice"] = cpuTime.GuestNice
 	}
 
 	createTime, err := proc.CreateTime()
@@ -177,8 +202,8 @@ func getStats(proc *process.Process) (map[string]interface{}, error) {
 		fields["process_uptime"] = time.Now().Unix() - (createTime / 1000)
 	}
 
-	cpuPerc, err := proc.Percent(time.Duration(0))
-	if err == nil && cpuPerc != 0 {
+	cpuPerc, err := proc.Percent(0)
+	if err == nil {
 		fields["cpu_usage"] = cpuPerc
 	}
 
