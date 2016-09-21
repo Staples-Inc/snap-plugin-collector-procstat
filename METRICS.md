@@ -16,13 +16,6 @@ Namespace                                        | Description
 /staples/procfs/procstat/\*/write_bytes                  | Number of bytes this process caused to be written to the storage layer
 /staples/procfs/procstat/\*/write_count                  | Number of write i/o operations by the process
 /staples/procfs/procstat/\*/process_uptime               | Number of seconds the process has been alive
-/staples/procfs/procstat/\*/cpu_time_guest               | The amount of time servicing guest OS systems by the process
-/staples/procfs/procstat/\*/cpu_time_guest_nice          | The amount of time servicing guest OS systems by the process
-/staples/procfs/procstat/\*/cpu_time_idle                | The amount of time the process spent idle
-/staples/procfs/procstat/\*/cpu_time_iowait              | The amount of time spent by the process servicing servicing i/o waits
-/staples/procfs/procstat/\*/cpu_time_irq                 | The amount of time servicing interrupts due to the process
-/staples/procfs/procstat/\*/cpu_time_nice                | The amount of time the process spent in user mode at low priority
-/staples/procfs/procstat/\*/cpu_time_soft_irq            | The amount of time servicing soft interrupts due to the process
-/staples/procfs/procstat/\*/cpu_time_stolen              | The amount of stolen time for this process
+/staples/procfs/procstat/\*/cpu_usage                    | Percent usage of the cpu by this process
 /staples/procfs/procstat/\*/cpu_time_system              | The amount of time spent in system mode on the cpu for this process
 /staples/procfs/procstat/\*/cpu_time_user                | The amount of time spent in user mode on the cpu for this process
