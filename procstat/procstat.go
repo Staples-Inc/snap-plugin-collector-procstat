@@ -50,7 +50,8 @@ type Procstat struct {
 func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.MetricType, error) {
 	pidsString, ok := metricTypes[0].Config().Table()["files"]
 	if !ok {
-		return metricTypes, log.Errorf("Unable to config file")
+		log.Errorf("unable to read config file\n")
+		return metricTypes, nil
 	}
 	pids := strings.Split(pidsString.(ctypes.ConfigValueStr).Value, ",")
 	mts := []plugin.MetricType{}
