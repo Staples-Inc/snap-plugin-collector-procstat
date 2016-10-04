@@ -43,19 +43,29 @@ func New() *Procstat {
 
 // Procstat defines procstat type
 type Procstat struct {
-	stats map[int32]*process.Process
+	initialized bool
+	pids        []string
+	stats       map[int32]*process.Process
+}
+
+func (p *Procstat) init(cfg map[string]ctypes.ConfigValue) error {
+	if filesVal, ok := cfg["files"]; ok {
+		p.pids = strings.Split(filesVal.(ctypes.ConfigValueStr).Value, ",")
+	}
+	p.initialized = true
+	return nil
 }
 
 // CollectMetrics returns metrics from gopsutil
 func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.MetricType, error) {
-	pidsString, ok := metricTypes[0].Config().Table()["files"]
-	if !ok {
-		log.Errorf("unable to read config file\n")
-		return metricTypes, nil
-	}
-	pids := strings.Split(pidsString.(ctypes.ConfigValueStr).Value, ",")
 	mts := []plugin.MetricType{}
-	for _, pid := range pids {
+	if !p.initialized {
+		if err := p.init(metricTypes[0].Config().Table()); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, pid := range p.pids {
 		pn := strings.Split(pid, ":")
 		pidVal, err := getPidFromFile(pn[0])
 		if err != nil {
@@ -98,6 +108,7 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 			}
 		}
 	}
+	p.initialized = true
 	return mts, nil
 }
 
