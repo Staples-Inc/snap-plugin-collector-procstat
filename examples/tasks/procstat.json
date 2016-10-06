@@ -7,25 +7,21 @@
     "workflow": {
         "collect": {
             "metrics": {
-                "/staples/procfs/procstat/*/cpu_usage" : {}
+                "/staples/*": {}
             },
             "config": {
-            },
-            "process": [
-                {
-                    "plugin_name": "passthru",
-                    "publish": [
-                        {
-                            "plugin_name": "file",
-                            "config": {
-                                "file": "/tmp/snap-file.out"
-                            }
-                        }
-                    ],
-                    "config": null
+                "/staples/procfs/procstat":{
+                    "files":"/tmp/snap.pid:coolio,/tmp/syslog.pid"
                 }
-            ],
-            "publish": null
+            },
+                "publish": [
+                    {
+                        "plugin_name": "file",
+                        "config": {
+                            "file": "/tmp/snap_procstat_file.out"
+                        }
+                    }
+                ]
         }
     }
 }

@@ -1,3 +1,17 @@
+// +build linux
+
+/*
+Copyright 2016 Staples, Inc.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+   http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package procstat
 
 import (
@@ -73,6 +87,7 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 			continue
 		}
 
+		// Check to see if pid has been registered before, useful if process is restarted
 		ps, ok := p.stats[pidVal]
 		if !ok {
 			ps, err = process.NewProcess(pidVal)
@@ -83,8 +98,9 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 			p.stats[pidVal] = ps
 		}
 
-		var processName string
 
+		// Check to see if process alias has been configured, if not use actual process name
+		var processName string
 		if len(pn) > 1 {
 			processName = pn[1]
 		} else {
@@ -95,16 +111,39 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 			}
 		}
 
-		fields, _ := p.getStats(ps)
-		for _, metricType := range metricTypes {
-			ns := metricType.Namespace()
+		
+		fields, err := p.getStats(ps)
+		if err != nil {
+			continue
+		}
+		for _, mt := range metricTypes {
+			ns := make(core.Namespace, len(mt.Namespace()))
+			copy(ns, mt.Namespace())
+			log.Infof("Creating metric: %v", ns.Strings())
 			if ns[3].Value == processName {
 				val, ok := getMapValueByNamespace(fields, ns[4:].Strings())
 				if ok != nil {
 					continue
 				}
-				metricType.AddData(val)
-				mts = append(mts, metricType)
+				ns[3].Value = processName
+				metric := plugin.MetricType{
+					Namespace_: ns,
+					Data_:      val,
+					Timestamp_: time.Now(),
+				}
+				mts = append(mts, metric)
+			} else if ns[3].Value == "*" {
+				val, ok := getMapValueByNamespace(fields, ns[4:].Strings())
+				if ok != nil {
+					continue
+				}
+				ns[3].Value = processName
+				metric := plugin.MetricType{
+					Namespace_: ns,
+					Data_:      val,
+					Timestamp_: time.Now(),
+				}
+				mts = append(mts, metric)
 			}
 		}
 	}
@@ -136,46 +175,11 @@ func getMapValueByNamespace(m map[string]interface{}, ns []string) (val interfac
 }
 
 // GetMetricTypes returns the metric types exposed by gopsutil
-func (p *Procstat) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType, error) {
-	pidsString := cfg.Table()["files"]
-	pids := strings.Split(pidsString.(ctypes.ConfigValueStr).Value, ",")
-	mts := []plugin.MetricType{}
-	for _, pid := range pids {
-		pn := strings.Split(pid, ":")
-		pidVal, err := getPidFromFile(pn[0])
-		if err != nil {
-			log.Errorf("unable to read pid from file '%v'", pn[0])
-			continue
-		}
-
-		ps, ok := p.stats[pidVal]
-		if !ok {
-			ps, err = process.NewProcess(pidVal)
-			if err != nil {
-				log.Errorf("%v, pid %v from file '%v' unable to be accessed at /proc", err, pidVal, pn[0])
-				continue
-			}
-		}
-
-		var processName string
-
-		if len(pn) > 1 {
-			processName = pn[1]
-		} else {
-			processName, err = ps.Name()
-			if err != nil {
-				log.Errorf("unable to parse process name of pid '%v' in '%v'", pidVal, pn[0])
-				continue
-			}
-		}
-		fields, err := p.getStats(ps)
-		if err != nil {
-			continue
-		}
-		for name := range fields {
-			ns := core.NewNamespace(vendor, "procfs", pluginName).AddStaticElement(processName).AddStaticElement(name)
-			appendMetric(&mts, ns, nil)
-		}
+func (p *Procstat) GetMetricTypes(cfg plugin.ConfigType) (mts []plugin.MetricType, err error) {
+	fields := []string{"numThreads", "fds", "voluntary_context_switches", "involuntary_context_switches", "read_count", "write_count", "read_bytes", "write_bytes", "cpu_time_user", "cpu_time_system", "process_uptime", "cpu_usage", "memory_rss", "memory_vms", "memory_swap"}
+	for name := range fields {
+		ns := core.NewNamespace(vendor, "procfs", pluginName).AddDynamicElement("processName", "Process Name").AddStaticElement(fields[name])
+		appendMetric(&mts, ns, nil)
 	}
 	return mts, nil
 }
@@ -260,6 +264,6 @@ func (p *Procstat) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	pidFile, _ := cpolicy.NewStringRule("files", true)
 	policy := cpolicy.NewPolicyNode()
 	policy.Add(pidFile)
-	cfg.Add([]string{vendor, "procstat"}, policy)
+	cfg.Add([]string{vendor, "procfs", pluginName}, policy)
 	return cfg, nil
 }
