@@ -38,11 +38,6 @@ const (
 	pluginVersion = 1
 )
 
-var (
-	errConfigError  = errors.New("Config read error: no pid file specified.")
-	errPidFileError = errors.New("Pid read error: specified file not valid.")
-)
-
 // Meta returns information about the plugin for the snap agent
 func Meta() *plugin.PluginMeta {
 	return plugin.NewPluginMeta(pluginName, pluginVersion, pluginType, []string{plugin.SnapGOBContentType}, []string{plugin.SnapGOBContentType})
@@ -58,16 +53,30 @@ func New() *Procstat {
 // Procstat defines procstat type
 type Procstat struct {
 	initialized bool
-	pids        []string
+	files       []string
 	stats       map[int32]*process.Process
 }
 
 func (p *Procstat) init(cfg map[string]ctypes.ConfigValue) error {
 	if filesVal, ok := cfg["files"]; ok {
-		p.pids = strings.Split(filesVal.(ctypes.ConfigValueStr).Value, ",")
+		p.files = strings.Split(filesVal.(ctypes.ConfigValueStr).Value, ",")
 	}
 	p.initialized = true
 	return nil
+}
+
+// checkPid if pid has been registered before, useful if process is restarted and pid changes
+func(p *Procstat) checkPid(pid int32) (ps *process.Process, err error){
+		ps, ok := p.stats[pid]
+		if !ok {
+			ps, err = process.NewProcess(pid)
+			if err != nil {
+				log.Errorf("pid %v from file unable to be accessed at /proc", pid)
+				return nil, errors.New("Unable to access pid at /proc")
+			}
+			p.stats[pid] = ps
+		}
+		return ps, nil
 }
 
 // CollectMetrics returns metrics from gopsutil
@@ -79,7 +88,7 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 		}
 	}
 
-	for _, pid := range p.pids {
+	for _, pid := range p.files {
 		pn := strings.Split(pid, ":")
 		pidVal, err := getPidFromFile(pn[0])
 		if err != nil {
@@ -88,14 +97,9 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 		}
 
 		// Check to see if pid has been registered before, useful if process is restarted
-		ps, ok := p.stats[pidVal]
-		if !ok {
-			ps, err = process.NewProcess(pidVal)
-			if err != nil {
-				log.Errorf("pid %v from file '%v' unable to be accessed at /proc", pidVal, pn[0])
-				continue
-			}
-			p.stats[pidVal] = ps
+		ps, err := p.checkPid(pidVal)
+		if err != nil {
+			continue
 		}
 
 
@@ -119,59 +123,27 @@ func (p *Procstat) CollectMetrics(metricTypes []plugin.MetricType) ([]plugin.Met
 		for _, mt := range metricTypes {
 			ns := make(core.Namespace, len(mt.Namespace()))
 			copy(ns, mt.Namespace())
-			log.Infof("Creating metric: %v", ns.Strings())
-			if ns[3].Value == processName {
-				val, ok := getMapValueByNamespace(fields, ns[4:].Strings())
-				if ok != nil {
+			var val interface{}
+			var ok bool
+			switch ns[3].Value {
+				case processName, "*":
+					if val, ok = fields[ns[4].Value]; !ok{
+						continue
+					}
+				default:
 					continue
-				}
-				ns[3].Value = processName
-				metric := plugin.MetricType{
-					Namespace_: ns,
-					Data_:      val,
-					Timestamp_: time.Now(),
-				}
-				mts = append(mts, metric)
-			} else if ns[3].Value == "*" {
-				val, ok := getMapValueByNamespace(fields, ns[4:].Strings())
-				if ok != nil {
-					continue
-				}
-				ns[3].Value = processName
-				metric := plugin.MetricType{
-					Namespace_: ns,
-					Data_:      val,
-					Timestamp_: time.Now(),
-				}
-				mts = append(mts, metric)
 			}
+			ns[3].Value = processName
+			metric := plugin.MetricType{
+				Namespace_: ns,
+				Data_:val,
+				Timestamp_: time.Now(),
+			}
+			mts = append(mts, metric)
 		}
 	}
 	p.initialized = true
 	return mts, nil
-}
-
-//getMapValueByNamespace gets value from map by namespace given in array of strings
-func getMapValueByNamespace(m map[string]interface{}, ns []string) (val interface{}, err error) {
-	if len(ns) == 0 {
-		return val, fmt.Errorf("Namespace length equal to zero")
-	}
-
-	current := ns[0]
-
-	var ok bool
-	if len(ns) == 1 {
-		if val, ok = m[current]; ok {
-			return val, err
-		}
-		return val, fmt.Errorf("Key does not exist in map {key %s}", current)
-	}
-
-	if v, ok := m[current].(map[string]interface{}); ok {
-		val, err = getMapValueByNamespace(v, ns[1:])
-		return val, err
-	}
-	return val, err
 }
 
 // GetMetricTypes returns the metric types exposed by gopsutil
