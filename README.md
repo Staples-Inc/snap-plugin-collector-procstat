@@ -1,5 +1,7 @@
 # snap collector plugin - procstat
 
+[![Build Status](https://travis-ci.org/Staples-Inc/snap-plugin-collector-procstat.svg?branch=master)](https://travis-ci.org/Staples-Inc/snap-plugin-collector-procstat)
+
 ## Getting Started
 The procstat collector takes a specified pid file and collects metrics from the process specified by that pid file.
 ### Build
