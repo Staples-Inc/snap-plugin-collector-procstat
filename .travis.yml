@@ -9,6 +9,7 @@ env:
   matrix:
     - TEST=unit
 before_install:
+- mkdir $GOPATH/bin
 - curl https://glide.sh/get | sh
 - go get github.com/smartystreets/goconvey/convey
 - go get github.com/stretchr/testify
