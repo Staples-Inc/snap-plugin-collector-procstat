@@ -11,7 +11,8 @@
             },
             "config": {
                 "/staples/procfs/procstat":{
-                    "files":"/tmp/snap.pid:coolio,/tmp/syslog.pid"
+                    "files":"/tmp/snap.pid:coolio,/tmp/syslog.pid",
+                    "pgrep":"syslog"
                 }
             },
                 "publish": [
