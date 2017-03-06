@@ -28,8 +28,6 @@ import (
 const (
 	proc_one = "psOne"
 	proc_two = "psTwo"
-
-	mock_path = "$GOPATH/src/github.com/Staples-Inc/mocks/"
 )
 
 type ProcInfoSuite struct {
@@ -39,14 +37,14 @@ type ProcInfoSuite struct {
 
 type pidMock struct {
 	name string
-	pid  int32
+	pid  []int32
 }
 
 func newPidMock(n string, p int32) Pid {
-	return &pidMock{name: n, pid: p}
+	return &pidMock{name: n, pid: []int32{p}}
 }
 
-func (p *pidMock) GetPid() (int32, error) {
+func (p *pidMock) GetPids() ([]int32, error) {
 	return p.pid, nil
 }
 func (p *pidMock) MarkFailed() {
@@ -95,8 +93,8 @@ func mockNew() *Procstat {
 	emptyCfg := make(map[string]ctypes.ConfigValue)
 	p.stats[1] = newProcessMock(proc_one)
 	p.stats[2] = newProcessMock(proc_two)
-	p.pids = append(p.pids, newPidMock(proc_one, 1))
-	p.pids = append(p.pids, newPidMock(proc_two, 2))
+	p.rules = append(p.rules, newPidMock(proc_one, 1))
+	p.rules = append(p.rules, newPidMock(proc_two, 2))
 	p.init(emptyCfg)
 	So(p, ShouldNotBeNil)
 	p.initialized = true
